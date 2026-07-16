@@ -4,14 +4,14 @@ require "nokolexbor"
 require 'json'
 
 # base_url = "https://games-stats.com/steam/game/fortune-paradox/"
-base_url = "https://store.steampowered.com/app/1363080/" # 4906570
-response = HTTParty.get base_url#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
-$document = Nokolexbor.HTML response
+BASE_URL = "https://store.steampowered.com/app/" # 4906570
+# response = HTTParty.get BASE_URL#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
+# $document = Nokolexbor.HTML response
 Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :early_access, :followers, :tags, :features
 Reviews = Struct.new :value, :percent, :count, :rating, :best, :worst
 Money = Struct.new :price, :currency, :revenue, :sale_price, :sale_percent
 Media = Struct.new :capsule, :screenshots
-games = []
+$games = []
 # puts $document
 
 def text_at(css)
@@ -105,8 +105,12 @@ def followers_for(title_of_game)
   nil
 end
 
-# do
-  url = base_url
+ARGV.each do |game_id|
+  puts "Scraping for #{game_id}"
+  url = BASE_URL + game_id
+  response = HTTParty.get url#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
+  $document = Nokolexbor.HTML response
+
   title = text_at("#appHubAppName")
   description = text_at(".game_description_snippet")
   release = text_at(".release_date")[/\t+(.+)/, 1]
@@ -124,8 +128,12 @@ end
   media = media_from_globals
 
   game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, early_access, followers, tags, features
-  pp game
-# end
+  $games << game
+end
+
+$games.each do |game|
+  pp game.title
+end
 
 # vr = "VR" mentioned in features
 # self_published = anything in developers is also in publishers
