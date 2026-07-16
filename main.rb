@@ -4,10 +4,10 @@ require "nokolexbor"
 require 'json'
 
 # base_url = "https://games-stats.com/steam/game/fortune-paradox/"
-base_url = "https://store.steampowered.com/app/1207650/" # 4906570
+base_url = "https://store.steampowered.com/app/3483510/" # 4906570
 response = HTTParty.get base_url#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
 $document = Nokolexbor.HTML response
-Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo
+Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms
 Reviews = Struct.new :value, :percent, :count, :rating, :best, :worst
 Money = Struct.new :price, :currency, :revenue, :sale_price, :sale_percent
 Media = Struct.new :capsule, :screenshots
@@ -47,54 +47,71 @@ def revenue_from(review_count, price)
 	gross * regional_adjustment * refunds * steam_cut * vat
 end
 
-def media_from(css)
-  # images = $document.at_css(css).css("img")
+def screenshots_from(css)
   data = $document.at_css(css).attribute("data-props").value
-  pp JSON.parse(data)["screenshots"].map { |screenshot| screenshot["full"] }
-  JSON.parse(data)
   # In order to extract video files we would need to grab the m3u8 or mpd files,
   # grab the m4s files from there, cat them together into one mp4 file. Not really
   # worth it, imo.
   # See: https://fileinfo.com/extension/m4s
+  JSON.parse(data)["screenshots"].map { |screenshot| screenshot["full"] }
 end
 
-# pp response
-# pp document
-# do
-  url = base_url
-#   pp document.content
-  title = text_at("#appHubAppName")
-  description = text_at(".game_description_snippet")
-  release = text_at(".release_date")[/\t+(.+)/, 1]
-  demo = not $document.at_css(".demo_above_purchase").nil?
-	
-  value = text_at("#userReviews .game_review_summary")
-  percent = percent_at("#userReviews .responsive_reviewdesc")
-  count = attribute_at("#userReviews meta[itemprop='reviewCount']", 'content')
-  rating = attribute_at("#userReviews meta[itemprop='ratingValue']", 'content')
-  best = attribute_at("#userReviews meta[itemprop='bestRating']", 'content')
-  worst = attribute_at("#userReviews meta[itemprop='worstRating']", 'content')
-  reviews = Reviews.new value, percent, count, rating, best, worst
+def reviews_from(css)
+  value = text_at(css + " .game_review_summary")
+  percent = percent_at(css + " .responsive_reviewdesc")
+  count = attribute_at(css + " meta[itemprop='reviewCount']", 'content')
+  rating = attribute_at(css + " meta[itemprop='ratingValue']", 'content')
+  best = attribute_at(css + " meta[itemprop='bestRating']", 'content')
+  worst = attribute_at(css + " meta[itemprop='worstRating']", 'content')
+  Reviews.new value, percent, count, rating, best, worst
+end
 
-
-  price = money_at(".game_area_purchase_game_wrapper .game_purchase_price")
+def money_from(css, reviews_count)
+  price = money_at(css + " .game_purchase_price")
   if price.nil?
-    price = money_at(".game_area_purchase_game_wrapper .discount_original_price")
-    sale_price = money_at(".game_area_purchase_game_wrapper .discount_final_price")
-    sale_percent = percent_at(".game_area_purchase_game_wrapper .discount_pct")
+    price = money_at(css + " .discount_original_price")
+    sale_price = money_at(css + " .discount_final_price")
+    sale_percent = percent_at(css + " .discount_pct")
   else
     sale_price = nil
     sale_percent = nil
   end
-  revenue = price.nil? ? nil : revenue_from(reviews.count, price)
-  money = Money.new price, "CAD", revenue, sale_price, sale_percent
+  revenue = price.nil? ? nil : revenue_from(reviews_count, price)
+  # TODO: We can grab the currency ("CAD") without hardcoding it in
+  Money.new price, "CAD", revenue, sale_price, sale_percent
+end
 
+def media_from_globals
   capsule = attribute_at("#gameHeaderImageCtn img", 'src')
-  media_data = media_from ".gamehighlight_desktopcarousel"
-  screenshots = []
-  videos = []
-  media = Media.new capsule, screenshots
+  screenshots = screenshots_from ".gamehighlight_desktopcarousel"
+  Media.new capsule, screenshots
+end
 
-  game = Game.new url, title, media, description, reviews, release, money, demo
+def link_text_at(css, index)
+  section = $document.css(css)[index]
+  section.css("a").map do |link|
+    link.text.strip
+  end
+end
+
+# do
+  url = base_url
+  title = text_at("#appHubAppName")
+  description = text_at(".game_description_snippet")
+  release = text_at(".release_date")[/\t+(.+)/, 1]
+  demo = not $document.at_css(".demo_above_purchase").nil?
+  reviews = reviews_from "#userReviews"
+  money = money_from ".game_area_purchase_game_wrapper", reviews.count
+  media = media_from_globals
+  developers = link_text_at(".dev_row .summary", 0)
+  publishers = link_text_at(".dev_row .summary", 1)
+  vr = false
+  early_access = false
+  followers = ""
+  tags = []
+  platforms = []
+  game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, vr, early_access, followers, tags, platforms
   pp game
 # end
+
+# :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms
