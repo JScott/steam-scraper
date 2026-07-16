@@ -4,10 +4,10 @@ require "nokolexbor"
 require 'json'
 
 # base_url = "https://games-stats.com/steam/game/fortune-paradox/"
-base_url = "https://store.steampowered.com/app/3483510/" # 4906570
+base_url = "https://store.steampowered.com/app/937090/" # 4906570
 response = HTTParty.get base_url#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
 $document = Nokolexbor.HTML response
-Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms
+Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms, :features
 Reviews = Struct.new :value, :percent, :count, :rating, :best, :worst
 Money = Struct.new :price, :currency, :revenue, :sale_price, :sale_percent
 Media = Struct.new :capsule, :screenshots
@@ -87,12 +87,26 @@ def media_from_globals
   Media.new capsule, screenshots
 end
 
-def link_text_at(css, index)
+def text_array_at(css, index, entry)
   section = $document.css(css)[index]
-  section.css("a").map do |link|
-    link.text.strip
+  section.css(entry).map do |entry|
+    entry.text.strip
   end
 end
+
+# def link_text_at(css, index)
+#   section = $document.css(css)[index]
+#   section.css("a").map do |link|
+#     link.text.strip
+#   end
+# end
+
+# def feature_text_at(css, entry)
+#   section = $document.at_css(css)
+#   section.css(entry).map do |entry|
+#     entry.text.strip
+#   end
+# end
 
 # do
   url = base_url
@@ -103,14 +117,15 @@ end
   reviews = reviews_from "#userReviews"
   money = money_from ".game_area_purchase_game_wrapper", reviews.count
   media = media_from_globals
-  developers = link_text_at(".dev_row .summary", 0)
-  publishers = link_text_at(".dev_row .summary", 1)
+  developers = text_array_at(".dev_row .summary", 0, 'a')
+  publishers = text_array_at(".dev_row .summary", 1, 'a')
   vr = false
   early_access = false
   followers = ""
   tags = []
   platforms = []
-  game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, vr, early_access, followers, tags, platforms
+  features = text_array_at(".game_area_features_list_ctn", 0, "div.label")
+  game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, vr, early_access, followers, tags, platforms, features
   pp game
 # end
 
