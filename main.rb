@@ -4,10 +4,10 @@ require "nokolexbor"
 require 'json'
 
 # base_url = "https://games-stats.com/steam/game/fortune-paradox/"
-base_url = "https://store.steampowered.com/app/937090/" # 4906570
+base_url = "https://store.steampowered.com/app/1363080/" # 4906570
 response = HTTParty.get base_url#, headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0'}
 $document = Nokolexbor.HTML response
-Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms, :features
+Game = Struct.new :url, :title, :media, :description, :reviews, :release, :price, :demo, :publishers, :developers, :early_access, :followers, :tags, :features
 Reviews = Struct.new :value, :percent, :count, :rating, :best, :worst
 Money = Struct.new :price, :currency, :revenue, :sale_price, :sale_percent
 Media = Struct.new :capsule, :screenshots
@@ -94,39 +94,39 @@ def text_array_at(css, index, entry)
   end
 end
 
-# def link_text_at(css, index)
-#   section = $document.css(css)[index]
-#   section.css("a").map do |link|
-#     link.text.strip
-#   end
-# end
+def css_exists(css)
+  not $document.at_css(css).nil?
+end
 
-# def feature_text_at(css, entry)
-#   section = $document.at_css(css)
-#   section.css(entry).map do |entry|
-#     entry.text.strip
-#   end
-# end
+def followers_for(title_of_game)
+  # https://newsletter.gamediscover.co/p/steams-follower-counts-hidden-in
+  # use this to implement https://steamcommunity.com/search/groups/#text=deltarune
+  # This can be useful because week 1 sales might be estimated with followers * 2.5
+  nil
+end
 
 # do
   url = base_url
   title = text_at("#appHubAppName")
   description = text_at(".game_description_snippet")
   release = text_at(".release_date")[/\t+(.+)/, 1]
-  demo = not $document.at_css(".demo_above_purchase").nil?
+  demo = css_exists(".demo_above_purchase")
+  developers = text_array_at(".dev_row .summary", 0, 'a')
+  publishers = text_array_at(".dev_row .summary", 1, 'a')
+  early_access = css_exists("#earlyAccessHeader")
+  followers = followers_for "title_of_game"
+  tags = text_array_at(".popular_tags", 0, "a.app_tag")
+  # platforms = text_array_at(".sysreq_tabs", 0, ".sysreq_tab")
+  features = text_array_at(".game_area_features_list_ctn", 0, "div.label")
+
   reviews = reviews_from "#userReviews"
   money = money_from ".game_area_purchase_game_wrapper", reviews.count
   media = media_from_globals
-  developers = text_array_at(".dev_row .summary", 0, 'a')
-  publishers = text_array_at(".dev_row .summary", 1, 'a')
-  vr = false
-  early_access = false
-  followers = ""
-  tags = []
-  platforms = []
-  features = text_array_at(".game_area_features_list_ctn", 0, "div.label")
-  game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, vr, early_access, followers, tags, platforms, features
+
+  game = Game.new url, title, media, description, reviews, release, money, demo, publishers, developers, early_access, followers, tags, features
   pp game
 # end
 
-# :publishers, :developers, :vr, :early_access, :followers, :tags, :platforms
+# vr = "VR" mentioned in features
+# self_published = anything in developers is also in publishers
+# platforms are annoying to fetch so we don't
